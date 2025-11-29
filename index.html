@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, maximum-scale=1.0">
-<title>Super Light Mobile Christmas</title>
+<title>Ultra Light Mobile Christmas</title>
 <link href="https://fonts.googleapis.com/css2?family=Great+Vibes&display=swap" rel="stylesheet">
 <style>
     body {
@@ -123,8 +123,8 @@ function noise(x, y, time) {
 // ================================
 const snowParticles = [];
 function createOrbitSnow() {
-    // Mobile: 3000, PC: 8000
-    const snowCount = isMobile ? 3000 : 8000; 
+    // Mobile: 2000 hạt (đã giảm thêm), PC: 8000
+    const snowCount = isMobile ? 2000 : 8000; 
     snowParticles.length = 0;
     
     const w = window.innerWidth;
@@ -151,7 +151,7 @@ function createOrbitSnow() {
 }
 
 // ================================
-// 2. HỆ THỐNG MẶT ĐẤT (ĐÃ GIẢM MẠNH CHO MOBILE)
+// 2. HỆ THỐNG MẶT ĐẤT (SIÊU NHẸ CHO MOBILE)
 // ================================
 const groundInner = [];  
 const groundMiddle = []; 
@@ -159,8 +159,11 @@ const groundOuter = [];
 
 function createGroundRing(array, count, minR, maxR, speed, sizeBase, alphaBase) {
     array.length = 0;
-    const tryCount = count * 1.5; 
-    const mobileSizeMultiplier = isMobile ? 1.5 : 1.0;
+    // Mobile giảm số lần thử loop để khởi tạo nhanh hơn
+    const tryCount = count * (isMobile ? 1.2 : 1.5); 
+    
+    // [THAY ĐỔI 1] Tăng kích thước hạt đất trên mobile gấp 3 lần để lấp đầy khoảng trống
+    const mobileSizeMultiplier = isMobile ? 3.0 : 1.0;
 
     for(let i=0; i<tryCount; i++) {
         const p = new Particle(0,0, 0, "", 0);
@@ -170,7 +173,8 @@ function createGroundRing(array, count, minR, maxR, speed, sizeBase, alphaBase) 
         const ratio = Math.random();
         p.orbitRadius = minR + ratio * (maxR - minR);
         
-        const normalizedHeight = Math.sin(p.orbitRadius * (isMobile ? 0.2 : 0.12)); 
+        // Giảm chi tiết rãnh trên mobile để trông mượt hơn với số lượng hạt ít
+        const normalizedHeight = Math.sin(p.orbitRadius * (isMobile ? 0.15 : 0.12)); 
         const spawnProbability = (normalizedHeight + 1) / 2 * 0.8 + 0.2;
 
         if (Math.random() < spawnProbability) {
@@ -195,12 +199,18 @@ function initGroundLayers() {
     const baseSpeed = 0.003; 
     const w = window.innerWidth;
     
-    // [THAY ĐỔI] Giảm mạnh số lượng hạt đất trên mobile (chỉ còn 25% so với PC)
-    const countScale = isMobile ? 0.25 : 1.0;
+    // [THAY ĐỔI 2] Giảm cực mạnh số lượng hạt trên mobile (chỉ còn 12%)
+    // Desktop vẫn giữ nguyên 100%
+    const countScale = isMobile ? 0.12 : 1.0;
 
+    // Vòng trong: Desktop 4000 -> Mobile ~480
     createGroundRing(groundInner, 4000 * countScale, w*0.02, w*0.28, baseSpeed*1.2, 1.5, 0.8);
-    createGroundRing(groundMiddle, 6000 * countScale, w*0.28, w*0.65, baseSpeed, 1.8, 0.6);
-    createGroundRing(groundOuter, 7000 * countScale, w*0.65, w*1.5, baseSpeed*0.8, 2.5, 0.4);
+    
+    // Vòng giữa: Desktop 5000 -> Mobile ~600
+    createGroundRing(groundMiddle, 5000 * countScale, w*0.28, w*0.65, baseSpeed, 1.8, 0.6);
+    
+    // Vòng ngoài: Desktop 6000 -> Mobile ~720
+    createGroundRing(groundOuter, 6000 * countScale, w*0.65, w*1.5, baseSpeed*0.8, 2.5, 0.4);
 }
 
 
@@ -220,7 +230,6 @@ function generateNaturalLayeredTree(cx, cy, baseColor, highlightColor) {
     const layers = 12; 
     const layerHeight = treeHeight / layers;
     
-    // Giảm nhẹ hạt cây trên mobile
     const particleCount = isMobile ? 4000 : 8000; 
     let created = 0; let attempts = 0;
     
@@ -243,7 +252,6 @@ function generateNaturalLayeredTree(cx, cy, baseColor, highlightColor) {
             
             let pColor = baseColor; 
             let pAlpha = 1.0; 
-            // Giữ kích thước nhỏ gọn như yêu cầu cũ
             let pSize = isMobile ? 1.8 : 1.5; 
             
             if (distFromCenter > 0.8) {
@@ -339,18 +347,16 @@ function drawTree(ctx, treeParticles, time, rotationSpeed) {
         ctx.fillStyle = p.color;
         
         if (scaleFactor > 0.8 && (p.color === "white" || p.color === "cyan" || p.color === "pink")) {
-             // Glow mạnh
              ctx.shadowBlur = (isMobile ? 12 : 15) * scaleFactor;
              ctx.shadowColor = p.color;
              ctx.globalAlpha = 1.0;
         } else {
-             // Glow nhẹ cho lõi
-             ctx.shadowBlur = (isMobile ? 5 : 8) * scaleFactor;
-             ctx.shadowColor = p.color;
+             ctx.shadowBlur = 0;
              ctx.globalAlpha = 0.98;
         }
         
         ctx.beginPath();
+        // Luôn vẽ tròn cho mượt
         ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
         ctx.fill();
     }
