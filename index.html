@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, maximum-scale=1.0">
-<title>Optimized Ground Particles Christmas</title>
+<title>Mobile Performance Christmas Scene</title>
 <link href="https://fonts.googleapis.com/css2?family=Great+Vibes&display=swap" rel="stylesheet">
 <style>
     body {
@@ -150,7 +150,7 @@ function createOrbitSnow() {
 }
 
 // ================================
-// 2. HỆ THỐNG MẶT ĐẤT (Đã giảm số lượng)
+// 2. HỆ THỐNG MẶT ĐẤT (ĐÃ TỐI ƯU CHO MOBILE)
 // ================================
 const groundInner = [];  
 const groundMiddle = []; 
@@ -193,15 +193,18 @@ function createGroundRing(array, count, minR, maxR, speed, sizeBase, alphaBase) 
 function initGroundLayers() {
     const baseSpeed = 0.003; 
     const w = window.innerWidth;
-    const countScale = isMobile ? 0.6 : 1.0;
+    
+    // [THAY ĐỔI QUAN TRỌNG] Giảm mạnh số lượng hạt trên mobile (chỉ còn 35%)
+    // Desktop vẫn giữ nguyên 100%
+    const countScale = isMobile ? 0.35 : 1.0;
 
-    // Vòng trong: Giữ nguyên 4000
+    // Vòng trong: Desktop 4000 -> Mobile ~1400
     createGroundRing(groundInner, 4000 * countScale, w*0.02, w*0.28, baseSpeed*1.2, 1.5, 0.8);
     
-    // [ĐÃ GIẢM] Vòng giữa: 6000 -> 5000
+    // Vòng giữa: Desktop 5000 -> Mobile ~1750
     createGroundRing(groundMiddle, 5000 * countScale, w*0.28, w*0.65, baseSpeed, 1.8, 0.6);
     
-    // [ĐÃ GIẢM] Vòng ngoài: 7000 -> 6000
+    // Vòng ngoài: Desktop 6000 -> Mobile ~2100
     createGroundRing(groundOuter, 6000 * countScale, w*0.65, w*1.5, baseSpeed*0.8, 2.5, 0.4);
 }
 
@@ -349,7 +352,8 @@ function drawTree(ctx, treeParticles, time, rotationSpeed) {
         }
         
         ctx.beginPath();
-        ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+        if (p.size < 0.5) ctx.rect(p.x, p.y, p.size, p.size);
+        else ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
         ctx.fill();
     }
     ctx.shadowBlur = 0;
