@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Parallax Snow Christmas</title>
+<link href="https://fonts.googleapis.com/css2?family=Great+Vibes&display=swap" rel="stylesheet">
+<style>
+    body {
+        margin: 0;
+        overflow: hidden;
+        background: #000011;
+        font-family: "Poppins", sans-serif;
+    }
+
+    #text {
+        position: absolute;
+        top: 15%; 
+        width: 100%;
+        text-align: center;
+        color: white;
+        opacity: 0;
+        filter: drop-shadow(0 0 15px rgba(255, 255, 255, 0.8));
+        animation: fadeIn 3s ease-in-out forwards;
+        z-index: 10;
+        pointer-events: none;
+        
+        font-family: 'Great Vibes', cursive;
+        font-weight: normal;
+        letter-spacing: 2px;
+        font-size: clamp(50px, 12vw, 120px); 
+        white-space: nowrap;
+    }
+
+    @keyframes fadeIn {
+        0% { opacity: 0; transform: translateY(20px); }
+        100% { opacity: 1; transform: translateY(0); }
+    }
+
+    canvas {
+        display: block;
+    }
+</style>
+</head>
+<body>
+
+<canvas id="canvas"></canvas>
+<div id="text">Merry Christmas</div>
+
+<script>
+const canvas = document.getElementById("canvas");
+const ctx = canvas.getContext("2d");
+
+let currentTreeHeight = 0;
+let isMobile = false;
+
+function resizeCanvas() {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+    isMobile = canvas.width < 768;
+}
+resizeCanvas();
+
+// ================================
+// PARTICLE CLASS
+// ================================
+class Particle {
+    constructor(x, y, size, color, alpha) {
+        this.x = x; 
+        this.y = y;
+        this.size = size;
+        this.baseSize = size; 
+        this.color = color;
+        this.alpha = alpha;
+        this.baseAlpha = alpha; 
+        this.rotation = Math.random() * Math.PI * 2;
+        
+        this.angle = Math.random() * Math.PI * 2;
+        this.orbitRadius = 0;
+        this.orbitSpeed = 0;
+        this.yOffset = 0;
+    }
+
+    draw(ctx) {
+        ctx.save();
+        let twinkle = 1;
+        if (this.baseAlpha > 0.4) {
+             this.rotation += 0.05;
+             twinkle = 0.8 + 0.2 * Math.cos(this.rotation);
+        }
+        
+        ctx.globalAlpha = Math.max(0, Math.min(1, this.alpha * twinkle));
+        ctx.fillStyle = this.color;
+        
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+        ctx.fill();
+        
+        ctx.restore();
+    }
+}
+
+function noise(x, y, time) {
+    const n = Math.sin(x * 0.01 + time) * Math.cos(y * 0.01 + time * 0.5);
+    return (n + 1) / 2;
+}
+
+// ================================
+// 1. HỆ THỐNG TUYẾT (Parallax Speed)
+// ================================
+const snowParticles = [];
+function createOrbitSnow() {
+    const snowCount = 10000; 
+    snowParticles.length = 0;
+    
+    const minRadius = canvas.width * 0.3; 
+    const maxRadius = canvas.width * 2.5;
+
+    for(let i=0; i<snowCount; i++) {
+        const p = new Particle(0,0, Math.random()*2+0.5, "rgba(255,255,255,0.8)", Math.random()*0.5+0.3);
+        p.angle = Math.random() * Math.PI * 2; 
+        
+        p.orbitRadius = minRadius + Math.pow(Math.random(), 1.5) * (maxRadius - minRadius);
+        p.yOffset = (Math.random() - 0.5) * canvas.height * 3.0; 
+        
+        // [THAY ĐỔI QUAN TRỌNG] Tính tốc độ dựa trên bán kính
+        // 1. Tính tỷ lệ vị trí: 0 (trong cùng) -> 1 (ngoài cùng)
+        const radiusRatio = (p.orbitRadius - minRadius) / (maxRadius - minRadius);
+        
+        // 2. Tốc độ: Trong chậm (0.005) -> Ngoài nhanh (0.005 + 0.025 = 0.03)
+        // Càng ra xa, radiusRatio càng lớn, tốc độ càng nhanh
+        p.orbitSpeed = 0.005 + (radiusRatio * 0.025);
+        
+        // Thêm chút ngẫu nhiên nhỏ để không bị đều chằn chặn
+        p.orbitSpeed += Math.random() * 0.002;
+
+        snowParticles.push(p);
+    }
+}
+
+// ================================
+// 2. HỆ THỐNG MẶT ĐẤT
+// ================================
+const groundInner = [];  
+const groundMiddle = []; 
+const groundOuter = [];  
+
+function createGroundRing(array, count, minR, maxR, speed, sizeBase, alphaBase) {
+    array.length = 0;
+    const tryCount = count * 1.5; 
+
+    for(let i=0; i<tryCount; i++) {
+        const p = new Particle(0,0, 0, "", 0);
+        p.angle = Math.random() * Math.PI * 2;
+
+        const ridgeValue = Math.sin(p.angle * 0) + Math.sin(Math.random()*maxR * 0.1);
+        const ratio = Math.random();
+        p.orbitRadius = minR + ratio * (maxR - minR);
+        
+        const normalizedHeight = Math.sin(p.orbitRadius * 0.12); 
+        const spawnProbability = (normalizedHeight + 1) / 2 * 0.8 + 0.2;
+
+        if (Math.random() < spawnProbability) {
+            const blueish = 200 + Math.random() * 55;
+            p.color = `rgba(${blueish}, ${blueish}, 255, 0.9)`;
+            
+            const brightnessFactor = (normalizedHeight + 1) / 2;
+            p.baseAlpha = alphaBase * (0.3 + 0.7 * brightnessFactor); 
+            p.baseSize = sizeBase * (0.5 + 0.5 * brightnessFactor);
+            
+            const randomness = (Math.random() - 0.5) * 10;
+            p.yOffset = (normalizedHeight * 15) + randomness; 
+            
+            p.orbitSpeed = speed;
+            array.push(p);
+            if (array.length >= count) break;
+        }
+    }
+}
+
+function initGroundLayers() {
+    const baseSpeed = 0.010; 
+
+    createGroundRing(groundInner, 4000, canvas.width*0.02, canvas.width*0.28, baseSpeed*1.2, 1.2, 0.7);
+    createGroundRing(groundMiddle, 6000, canvas.width*0.28, canvas.width*0.65, baseSpeed, 1.5, 0.5);
+    createGroundRing(groundOuter, 7000, canvas.width*0.65, canvas.width*1.5, baseSpeed*0.8, 2.0, 0.3);
+}
+
+
+// ================================
+// 3. LOGIC TẠO CÂY
+// ================================
+function generateNaturalLayeredTree(cx, cy, baseColor, highlightColor) {
+    const treeParticles = [];
+    
+    const heightRatio = isMobile ? 0.45 : 0.55;
+    const treeHeight = canvas.height * heightRatio;
+    currentTreeHeight = treeHeight;
+
+    const maxBaseWidth = isMobile ? (canvas.width * 0.18) : 120; 
+    
+    const layers = 12; 
+    const layerHeight = treeHeight / layers;
+    const particleCount = 8000; 
+    let created = 0; let attempts = 0;
+    
+    while (created < particleCount && attempts < particleCount * 15) {
+        attempts++;
+        const relY = Math.random() * treeHeight;
+        const normalizedY = relY / treeHeight;
+        const progressInLayer = (relY % layerHeight) / layerHeight;
+        
+        const layerFlare = 1 + 0.8 * Math.pow((1 - progressInLayer), 1.5);
+        const coneWidth = maxBaseWidth * (1 - normalizedY);
+        const maxWidthAtY = coneWidth * layerFlare;
+        
+        const randomPos = Math.random(); 
+        const offsetX = (randomPos * maxWidthAtY) * (Math.random() > 0.5 ? 1 : -1);
+        
+        if (Math.abs(offsetX) <= maxWidthAtY) {
+            const y = cy - relY;
+            const distFromCenter = Math.abs(offsetX) / maxWidthAtY;
+            let pColor = baseColor; let pAlpha = 0.8; const pSize = 1.2; 
+            if (distFromCenter > 0.8) {
+                pColor = "white"; pAlpha = 1;      
+                if (Math.random() > 0.7) pColor = highlightColor;
+            } else if (distFromCenter < 0.3) { pAlpha = 0.5; }
+
+            treeParticles.push({
+                cx: cx, radius: offsetX, baseY: y,         
+                size: pSize, baseSize: pSize, color: pColor, 
+                alpha: pAlpha, baseAlpha: pAlpha, 
+                startAngle: Math.random() * Math.PI * 2, 
+                rotation: Math.random() * Math.PI * 2,
+                rotationSpeed: (Math.random() - 0.5) * 0.05
+            });
+            created++;
+        }
+    }
+    return treeParticles;
+}
+
+let leftTree = [];
+let rightTree = [];
+let treeBaseY; 
+
+function initTrees() {
+    treeBaseY = canvas.height * 0.88;
+    const offset = isMobile ? 0.20 : 0.25;
+    leftTree = generateNaturalLayeredTree(canvas.width * offset, treeBaseY, "rgba(100, 149, 237, 0.8)", "cyan");
+    rightTree = generateNaturalLayeredTree(canvas.width * (1-offset), treeBaseY, "rgba(219, 112, 147, 0.8)", "pink");
+}
+
+// ================================
+// VẼ & ANIMATION
+// ================================
+
+function updateAndDrawOrbit(ctx, particles, layer, centerY, flatten, maxZ) {
+    const centerX = canvas.width / 2;
+    particles.forEach(p => {
+        if (layer === 'back' || layer === 'all') { p.angle += p.orbitSpeed; }
+        
+        const relativeZ = p.orbitRadius * Math.sin(p.angle);
+        const shouldDraw = (layer === 'all') || 
+                           (layer === 'back' && relativeZ < 0) || 
+                           (layer === 'front' && relativeZ >= 0);
+
+        if (shouldDraw) {
+            const relativeX = p.orbitRadius * Math.cos(p.angle);
+            const perspectiveY = relativeZ * flatten; 
+            const zNormalized = relativeZ / maxZ;
+            
+            const scaleBase = 0.5; 
+            const scaleFactor = 1 + zNormalized * scaleBase; 
+            const alphaFactor = 1 + zNormalized * 0.5;
+
+            p.x = centerX + relativeX;
+            p.y = centerY + perspectiveY + p.yOffset; 
+            
+            p.size = Math.max(0.2, p.baseSize * scaleFactor);
+            p.alpha = Math.max(0, Math.min(1, p.baseAlpha * alphaFactor));
+            
+            if (p.alpha > 0.01) p.draw(ctx);
+        }
+    });
+}
+
+function drawTree(ctx, treeParticles, time, rotationSpeed) {
+    treeParticles.forEach(p => {
+        const currentAngle = p.startAngle + time * rotationSpeed;
+        const relativeX = p.radius * Math.cos(currentAngle);
+        const relativeZ = p.radius * Math.sin(currentAngle);
+        const zNormalized = relativeZ / 150; 
+        const scaleFactor = 1 + zNormalized * 0.4;
+        const currentSize = p.baseSize * scaleFactor;
+        const currentAlpha = Math.max(0.1, Math.min(1, p.baseAlpha * (1 + zNormalized * 0.5)));
+        const windY = (noise(p.cx, p.baseY, time * 0.8) - 0.5) * 3;
+        const drawX = p.cx + relativeX;
+        const drawY = p.baseY + windY;
+        p.rotation += p.rotationSpeed;
+        const twinkle = 0.7 + 0.3 * Math.sin(p.rotation * 3);
+        ctx.save();
+        ctx.globalAlpha = currentAlpha * twinkle;
+        ctx.fillStyle = p.color;
+        if ((p.color === "white" || p.color === "cyan" || p.color === "pink") && scaleFactor > 0.9) {
+            ctx.shadowBlur = 3 * scaleFactor; ctx.shadowColor = "white";
+        } else { ctx.shadowBlur = 0; }
+        ctx.beginPath();
+        ctx.arc(drawX, drawY, currentSize, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+    });
+}
+
+function drawGlowingStar(ctx, x, y, color, angle) {
+    ctx.save(); ctx.translate(x, y);
+    const rotate3D = Math.cos(angle);
+    const scale = isMobile ? 2.0 : 1.3; 
+    ctx.scale(scale * rotate3D, scale); 
+    ctx.shadowBlur = 25; ctx.shadowColor = color; ctx.fillStyle = color;
+    ctx.beginPath();
+    const spikes = 5; const outerRadius = 15; const innerRadius = 7;
+    let rot = Math.PI / 2 * 3; let x_coord = 0; let y_coord = 0;
+    const step = Math.PI / spikes;
+    ctx.moveTo(0, 0 - outerRadius);
+    for (let i = 0; i < spikes; i++) {
+        x_coord = Math.cos(rot) * outerRadius; y_coord = Math.sin(rot) * outerRadius;
+        ctx.lineTo(x_coord, y_coord); rot += step;
+        x_coord = Math.cos(rot) * innerRadius; y_coord = Math.sin(rot) * innerRadius;
+        ctx.lineTo(x_coord, y_coord); rot += step;
+    }
+    ctx.lineTo(0, 0 - outerRadius); ctx.closePath(); ctx.fill();
+    ctx.shadowBlur = 5; ctx.fillStyle = "white"; ctx.fill();
+    ctx.restore();
+}
+
+function drawGlowingMoon(ctx, x, y, color, angle) {
+    ctx.save(); ctx.translate(x, y);
+    const rotate3D = Math.cos(angle);
+    const scale = isMobile ? 2.0 : 1.3;
+    ctx.scale(scale * rotate3D, scale); 
+    ctx.shadowBlur = 25; ctx.shadowColor = color; ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.arc(0, 0, 15, 0.5 * Math.PI, 1.5 * Math.PI, true);
+    ctx.bezierCurveTo(10, -12, 10, 12, 0, 15);
+    ctx.closePath(); ctx.fill();
+    ctx.shadowBlur = 5; ctx.fillStyle = "white"; ctx.fill();
+    ctx.restore();
+}
+
+// KHỞI TẠO
+createOrbitSnow();
+initGroundLayers();
+initTrees();
+
+let time = 0;
+function animate() {
+    time += 0.01;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    
+    const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
+    gradient.addColorStop(0, "#000011"); gradient.addColorStop(1, "#1a0b2e");
+    ctx.fillStyle = gradient; ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    const snowCenterY = canvas.height * 0.5; 
+    const groundCenterY = canvas.height * 0.88; 
+    const flatten = 0.15;
+    const maxZ = canvas.width * 1.8; 
+
+    // --- LỚP SAU ---
+    updateAndDrawOrbit(ctx, snowParticles, 'back', snowCenterY, flatten, maxZ);
+    updateAndDrawOrbit(ctx, groundOuter, 'back', groundCenterY, flatten, maxZ);
+    updateAndDrawOrbit(ctx, groundMiddle, 'back', groundCenterY, flatten, maxZ);
+    updateAndDrawOrbit(ctx, groundInner, 'all', groundCenterY, flatten, maxZ);
+
+    // --- LỚP GIỮA (Cây) ---
+    const treeRotationSpeed = 0.5; 
+    drawTree(ctx, leftTree, time, treeRotationSpeed);
+    drawTree(ctx, rightTree, time, -treeRotationSpeed);
+    
+    const treeTopY = treeBaseY - currentTreeHeight;
+    const topperY = treeTopY - 60; 
+    const offset = isMobile ? 0.20 : 0.25;
+
+    const leftTreeAngle = time * treeRotationSpeed;
+    const rightTreeAngle = time * -treeRotationSpeed;
+
+    drawGlowingStar(ctx, canvas.width * offset, topperY + Math.sin(time*2)*2, "cyan", leftTreeAngle);
+    drawGlowingMoon(ctx, canvas.width * (1-offset), topperY + Math.cos(time*2)*2, "pink", rightTreeAngle);
+
+    // --- LỚP TRƯỚC ---
+    updateAndDrawOrbit(ctx, groundMiddle, 'front', groundCenterY, flatten, maxZ);
+    updateAndDrawOrbit(ctx, groundOuter, 'front', groundCenterY, flatten, maxZ);
+    updateAndDrawOrbit(ctx, snowParticles, 'front', snowCenterY, flatten, maxZ);
+
+    requestAnimationFrame(animate);
+}
+
+window.addEventListener('resize', () => {
+    resizeCanvas();
+    createOrbitSnow();
+    initGroundLayers();
+    initTrees();
+});
+
+animate();
+</script>
+</body>
+</html>
